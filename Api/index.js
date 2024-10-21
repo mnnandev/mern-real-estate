@@ -17,8 +17,8 @@ app.use(express.json());
 app.listen(3000, () => {
   console.log("server start!!!");
 });
-app.use("/Api/user", userRouter);
-app.use("/Api/auth", authRouter);
+app.use("/api/user", userRouter);
+app.use("/api/auth", authRouter);
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
   const message = err.message || "Internal server error bruhjj!";
