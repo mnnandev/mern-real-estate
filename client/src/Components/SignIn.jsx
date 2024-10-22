@@ -1,73 +1,102 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useFormik } from "formik";
+import * as Yup from "yup";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  signInFailure,
+  signInStart,
+  signInSucess,
+} from "../redux/user/userSlice";
 
 const SignIn = () => {
-  const [data, setData] = useState({}); // State to hold form data
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const { error, loading } = useSelector((state) => state.user);
+  const [errorMessage, setErrorMessage] = useState(""); // State to store error message
 
-  const onChangeHandler = (e) => {
-    setData({
-      ...data,
-      [e.target.name]: e.target.value, // Dynamically update the state based on input name
-    });
-    console.log({...data, [e.target.name]: e.target.value}, 'this is a data'); // Log the new data state
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('/Api/auth/signUp', {  
-        method: 'POST', // Use uppercase POST for consistency
-        headers: {
-          'Content-Type': 'application/json', // Proper capitalization for content-type
-        },
-        body: JSON.stringify(data), // Convert the data object to a JSON string
-      });
-
-      if (!res.ok) {
-        const errorResponse = await res.json(); // Get error details from the response
-        throw new Error(errorResponse.message || 'An error occurred'); // Throw a meaningful error message
+  // Formik setup with initial values and validation schema
+  const formik = useFormik({
+    initialValues: {
+      email: "",
+      password: "",
+    },
+    validationSchema: Yup.object({
+      email: Yup.string()
+        .email("Invalid email address")
+        .required("Email is required"),
+      password: Yup.string()
+        .min(6, "Password must be at least 6 characters")
+        .required("Password is required"),
+    }),
+    onSubmit: async (values, { setSubmitting, resetForm }) => {
+      dispatch(signInStart());
+      try {
+        const res = await axios.post("/api/auth/SignIn", values);
+        dispatch(signInSucess(res.data));
+        console.log("authenticated user:", res.data); // Log the successful response
+        resetForm(); // Reset the form fields after successful submission
+        navigate("/");
+      } catch (error) {
+        if (error.response && error.response.data) {
+          // Display specific error message from the server response
+          dispatch(
+            signInFailure(error.response.data.message || "An error occurred")
+          );
+        } else {
+          // Generic error message for unexpected errors
+          dispatch(
+            signInFailure(
+              "An error occurred while signing in. Please try again."
+            )
+          );
+        }
+        setSubmitting(false); // Reset the submitting state
       }
+    },
+  });
 
-      const response = await res.json(); // Parse the JSON response
-      console.log('Data is added successfully:', response); // Log the successful response
-      // Handle successful sign-up (e.g., redirect, show success message)
-
-    } catch (error) {
-      console.error('Sign-up failed:', error.message); // Log the error message
-      // Display the error message to the user (optional)
-    }
-  };
   return (
     <div className="p-3 max-w-lg mx-auto">
       <h1 className="text-3xl text-center font-semibold my-7">Sign In</h1>
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+      <form className="flex flex-col gap-4" onSubmit={formik.handleSubmit}>
         <input
           type="email"
           placeholder="Email"
           name="email"
           className="border p-3 rounded-lg"
-          onChange={onChangeHandler}
-          required
+          onChange={formik.handleChange}
+          onBlur={formik.handleBlur}
+          value={formik.values.email}
         />
+        {formik.touched.email && formik.errors.email ? (
+          <div className="text-red-600">{formik.errors.email}</div>
+        ) : null}
+
         <input
           type="password"
           placeholder="Password"
           name="password"
-          onChange={onChangeHandler}
           className="border p-3 rounded-lg"
-          required
+          onChange={formik.handleChange}
+          onBlur={formik.handleBlur}
+          value={formik.values.password}
         />
+        {formik.touched.password && formik.errors.password ? (
+          <div className="text-red-600">{formik.errors.password}</div>
+        ) : null}
+
+{error && (
+          <div className="text-red-600">{error}</div> // Display server error messages from Redux
+        )}
+
         <button
           type="submit"
           className="bg-slate-700 text-white p-3 rounded-lg uppercase hover:opacity-95 disabled:opacity-80"
+          disabled={formik.isSubmitting} // Disable button when submitting
         >
-          Sign In
-        </button>
-        <button
-          type="button"
-          className="bg-red-700 text-white rounded-lg p-3 uppercase hover:opacity-95"
-        >
-          Continue with Google
+          {formik.isSubmitting ? "...Loading" : "Sign In"}
         </button>
       </form>
       <div className="flex gap-2 mt-5">
@@ -76,7 +105,6 @@ const SignIn = () => {
           <span className="text-blue-500">Sign up</span>
         </Link>
       </div>
-      <p className="text-red-700 mt-5"></p>
     </div>
   );
 };
